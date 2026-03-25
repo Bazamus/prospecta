@@ -1,7 +1,12 @@
 import { neon } from "@neondatabase/serverless"
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL no está definida en las variables de entorno")
+function getDbClient() {
+  const url = process.env.DATABASE_URL
+  if (!url || url.includes("user:password@host")) {
+    console.warn("DATABASE_URL no configurada — las queries a BD fallarán")
+    return null
+  }
+  return neon(url)
 }
 
-export const sql = neon(process.env.DATABASE_URL)
+export const sql = getDbClient()
