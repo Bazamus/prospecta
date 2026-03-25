@@ -1,4 +1,4 @@
-# ProspectFlow
+# Prospecta
 
 **Sistema de Prospección Comercial Inteligente**
 
