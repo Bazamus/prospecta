@@ -1,4 +1,4 @@
-# Arquitectura y Decisiones Técnicas — ProspectFlow
+# Arquitectura y Decisiones Técnicas — Prospecta
 
 ---
 
@@ -7,26 +7,137 @@
 ### ¿Por qué Next.js 14 y no React + Vite?
 
 Las demos existentes (aisla_partes, partes_insta) están en React + Vite y se mantienen así.
-ProspectFlow arranca en Next.js 14 por tres razones concretas:
+Prospecta arranca en Next.js 14 por tres razones concretas:
 
 1. **API routes integradas** — el backend de envío de emails, llamadas a Claude API y webhooks de Evolution API viven en el mismo proyecto, sin servidor separado
-2. **Middleware de Supabase Auth** — protección de rutas sin configuración adicional
+2. **NextAuth** — protección de rutas con sesión simple, sin dependencia de Supabase Auth
 3. **Vercel es el creador de Next.js** — el deploy es prácticamente automático y sin fricciones
 
-### ¿Por qué Supabase y no otra BD?
+### ¿Por qué Neon y no Supabase?
 
-- Stack ya conocido y en uso en otros proyectos
-- Auth integrado, sin necesidad de implementar sistema propio
-- Row Level Security nativo — preparado para multitenancy en Fase 4 sin migraciones
-- Dashboard visual para gestión directa de datos durante el desarrollo
-- Client-side y server-side SDKs para Next.js
+- Supabase cobra por proyecto adicional en plan Pro — inviable para múltiples demos
+- Neon ofrece hasta 10 proyectos gratuitos en PostgreSQL 17
+- Compatible 100% con el schema SQL existente
+- Sin límite de proyectos en desarrollo — ideal para escalar demos por nicho
+- Conexión directa desde Next.js via `@neondatabase/serverless` o `pg`
 
 ### ¿Por qué Claude API para el scoring?
 
 - Capacidad de razonamiento contextual: no es una clasificación por palabras clave, es un análisis real del perfil de la empresa
 - La justificación generada es legible y útil para el usuario
 - El mismo modelo se reutiliza para generar mensajes, manteniendo coherencia de contexto
+- Puede analizar el XML de reseñas de Google Maps para extraer señales cualitativas
 - Fácil de ajustar mediante prompt engineering sin tocar código
+
+---
+
+## Formato de importación CSV/Excel — Referencia
+
+El archivo de referencia es `docs/ejemplo_import.xlsx` — formato con **una fila por negocio**.
+
+### Columnas disponibles y su uso
+
+| Columna Excel | Campo en BD | Uso |
+|---------------|-------------|-----|
+| Nombre | `nombre_empresa` | Obligatorio |
+| Categoría | `nicho` | Mapeo automático por categoría |
+| Rating | `valoracion_google` | Input scoring IA |
+| Nº Reviews | `num_resenas` | Input scoring IA |
+| ReviewsText | — | Input scoring IA (XML con reseñas) |
+| Horario | — | Input scoring IA (negocio activo/inactivo) |
+| Descripción | — | Input scoring IA |
+| Direccion | `direccion` | Dirección completa |
+| Localidad | parte de `direccion` | Segmentación geográfica |
+| Provincia | parte de `direccion` | Segmentación geográfica |
+| Website | `web` | Input scoring IA (madurez digital) |
+| Teléfono | `telefono` | Contacto |
+| email | `email` | Contacto (único, obligatorio) |
+| Latitud / Longitud | — | Descartado |
+| Iframe / Imagen Url | — | Descartado |
+| hash / id / Saved | — | Descartado |
+
+### Procesamiento del campo ReviewsText
+
+El campo `ReviewsText` contiene XML con las reseñas de Google Maps:
+
+```xml
+<reviews>
+  <review>
+    <user>Nombre usuario</user>
+    <stars>5</stars>
+    <userComment>Texto de la reseña...</userComment>
+  </review>
+</reviews>
+```
+
+El importador parsea este XML y concatena los comentarios como texto plano para enviarlo como contexto adicional a la Claude API durante el scoring.
+
+### Mapeo de Categoría → Nicho
+
+| Categoría Google Maps | Nicho en BD |
+|----------------------|-------------|
+| Carpintería metálica y de aluminio | `instalaciones` |
+| Climatización / Aire acondicionado | `climatizacion` |
+| Instalaciones técnicas | `instalaciones` |
+| Gestión energética / Energía solar | `energia` |
+| Resto de categorías | `otro` |
+
+> Este mapeo es configurable en `lib/import/nicho-mapping.ts`
+
+---
+
+## Flujo de importación con scoring IA
+
+```
+Excel/CSV subido por usuario
+        ↓
+API route /api/prospects/import
+        ↓
+Parseo del archivo (xlsx → JSON)
+        ↓
+Deduplicación por email o nombre_empresa
+        ↓
+Para cada empresa → /api/prospects/score
+        ↓
+Claude API recibe:
+  - Nombre, categoría, rating, nº reseñas
+  - Website (¿tiene web propia?)
+  - Horario (¿está activo?)
+  - ReviewsText parseado (texto de reseñas)
+  - Nicho objetivo de la campaña
+        ↓
+Claude devuelve JSON:
+  { "score": 7.8, "etiqueta": "Alta", "justificacion": "..." }
+        ↓
+Tabla previa de revisión en UI
+        ↓
+Usuario filtra por score mínimo y confirma
+        ↓
+INSERT en Neon solo con registros aprobados
+```
+
+### Prompt de scoring — estructura
+
+```
+System: Eres un analizador de prospectos comerciales especializado en [NICHO].
+Tu tarea es evaluar si una empresa es un buen candidato para contactarle
+y ofrecerle [PRODUCTO].
+
+Devuelve ÚNICAMENTE un JSON con este formato exacto:
+{
+  "score": <número entre 0 y 10 con un decimal>,
+  "etiqueta": <"Alta" | "Media" | "Baja" | "Descartar">,
+  "justificacion": <string de 1-2 frases explicando el razonamiento>
+}
+
+Criterios:
+- 8-10 (Alta): Empresa del sector, activa, volumen suficiente, tiene web
+- 5-7 (Media): Encaje probable pero con incertidumbre
+- 3-4 (Baja): Encaje dudoso
+- 0-2 (Descartar): Fuera del sector, inactiva o sin datos suficientes
+
+User: [JSON con datos de la empresa + texto de reseñas]
+```
 
 ---
 
@@ -55,7 +166,7 @@ frontend/
 │   │       └── page.tsx            # Gestión de plantillas
 │   └── api/
 │       ├── prospects/
-│       │   ├── import/route.ts     # POST — importar CSV
+│       │   ├── import/route.ts     # POST — importar Excel/CSV
 │       │   └── score/route.ts      # POST — scoring IA
 │       ├── messages/
 │       │   ├── generate/route.ts   # POST — generar mensaje IA
@@ -68,7 +179,7 @@ frontend/
 │   ├── prospects/
 │   │   ├── ProspectTable.tsx
 │   │   ├── ProspectDetail.tsx
-│   │   ├── ImportModal.tsx
+│   │   ├── ImportModal.tsx         # Upload Excel + previsualización scoring
 │   │   └── ScoreCard.tsx
 │   ├── campaigns/
 │   │   ├── CampaignCard.tsx
@@ -81,68 +192,18 @@ frontend/
 │       ├── Funnel.tsx
 │       └── ActivityFeed.tsx
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts               # Cliente Supabase browser
-│   │   └── server.ts               # Cliente Supabase server
-│   ├── claude.ts                   # Wrapper Claude API
+│   ├── db/
+│   │   └── neon.ts                 # Cliente Neon (pg / @neondatabase/serverless)
+│   ├── import/
+│   │   ├── parser.ts               # Parseo Excel → JSON
+│   │   ├── nicho-mapping.ts        # Mapeo categoría Google → nicho BD
+│   │   └── reviews-parser.ts      # Parser XML de ReviewsText
+│   ├── claude.ts                   # Wrapper Claude API (scoring + mensajes)
 │   ├── resend.ts                   # Wrapper Resend
 │   └── evolution.ts                # Wrapper Evolution API
 ├── types/
 │   └── index.ts                    # Tipos TypeScript globales
-└── middleware.ts                   # Auth middleware Supabase
-```
-
----
-
-## Flujo de scoring IA — Detalle técnico
-
-```
-Usuario sube CSV
-      ↓
-API route /api/prospects/import
-      ↓
-Parseo y validación del CSV
-      ↓
-Para cada fila → llamada a /api/prospects/score
-      ↓
-Claude API recibe:
-  - System prompt: instrucciones de scoring por nicho
-  - User message: datos completos de la empresa en JSON
-      ↓
-Claude devuelve JSON con:
-  {
-    "score": 7.8,
-    "etiqueta": "Alta",
-    "justificacion": "Empresa activa con web propia..."
-  }
-      ↓
-Datos enriquecidos se muestran al usuario para revisión
-      ↓
-Usuario filtra y confirma importación
-      ↓
-INSERT en Supabase solo con registros aprobados
-```
-
-**Prompt de scoring — estructura:**
-
-```
-System: Eres un analizador de prospectos comerciales especializado en [NICHO].
-Tu tarea es evaluar si una empresa es un buen candidato para contactar y ofrecerle [PRODUCTO].
-
-Devuelve ÚNICAMENTE un JSON con este formato exacto:
-{
-  "score": <número entre 0 y 10 con un decimal>,
-  "etiqueta": <"Alta" | "Media" | "Baja" | "Descartar">,
-  "justificacion": <string de 1-2 frases explicando el razonamiento>
-}
-
-Criterios de puntuación:
-- 8-10 (Alta): Empresa claramente del sector, activa, con señales de volumen
-- 5-7 (Media): Encaje probable pero con incertidumbre
-- 3-4 (Baja): Encaje dudoso, contactar solo si no hay mejores opciones
-- 0-2 (Descartar): Fuera del sector, inactiva o sin datos suficientes
-
-User: [JSON con los datos de la empresa]
+└── middleware.ts                   # Auth middleware NextAuth
 ```
 
 ---
@@ -150,10 +211,12 @@ User: [JSON con los datos de la empresa]
 ## Variables de entorno necesarias
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+# Neon (PostgreSQL)
+DATABASE_URL=postgresql://user:password@host.neon.tech/prospecta?sslmode=require
+
+# NextAuth
+NEXTAUTH_SECRET=
+NEXTAUTH_URL=http://localhost:3000
 
 # Claude API
 ANTHROPIC_API_KEY=
@@ -162,61 +225,40 @@ ANTHROPIC_API_KEY=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 
-# Evolution API (ya desplegada)
+# Evolution API (ya desplegada en VPS)
 EVOLUTION_API_URL=
 EVOLUTION_API_KEY=
 EVOLUTION_INSTANCE=
 
 # App
-NEXT_PUBLIC_APP_URL=
-```
-
----
-
-## CSV estandarizado — Formato de importación
-
-El CSV de importación debe seguir esta estructura. Las columnas marcadas con * son obligatorias.
-
-```
-nombre_empresa*   | text
-nicho*            | climatizacion | instalaciones | energia | otro
-email*            | email válido
-telefono          | texto libre
-direccion         | texto libre
-contacto_nombre   | texto libre
-contacto_cargo    | texto libre
-web               | URL
-valoracion_google | número decimal (ej: 4.3)
-num_resenas       | número entero
-notas             | texto libre
-```
-
-**Ejemplo de fila:**
-```
-Climatizaciones Pérez S.L.,climatizacion,info@climaperez.es,+34 963 123 456,Calle Mayor 12 Valencia,Juan Pérez,Gerente,www.climaperez.es,4.3,87,Empresa familiar con 15 años
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ---
 
 ## Integraciones externas — Referencias
 
+### Neon
+- Docs: https://neon.tech/docs
+- SDK recomendado: `@neondatabase/serverless` (optimizado para serverless/Vercel)
+- Alternativa: `pg` con connection pooling
+
 ### Resend
 - Docs: https://resend.com/docs
 - SDK: `npm install resend`
-- Webhook para tracking de aperturas: configurar en dashboard de Resend → endpoint `/api/webhooks/resend`
+- Webhook tracking: configurar en Resend dashboard → `/api/webhooks/resend`
 
 ### Evolution API
 - Ya desplegada en VPS EasyPanel
 - Instancia configurada en proyectos A360/ACLIMAR
-- Endpoint base: variable `EVOLUTION_API_URL`
-- Documentación: https://doc.evolution-api.com
+- Docs: https://doc.evolution-api.com
 
 ### Claude API
-- Modelo: `claude-sonnet-4-5` (relación calidad/coste óptima para este caso)
-- Max tokens scoring: 300 (respuesta JSON corta)
+- Modelo: `claude-sonnet-4-5`
+- Max tokens scoring: 300
 - Max tokens mensajes: 800
 - Docs: https://docs.anthropic.com
 
 ---
 
-*ProspectFlow — Arquitectura interna · 2026*
+*Prospecta — Arquitectura interna · v1.2 · 2026*
