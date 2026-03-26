@@ -46,6 +46,13 @@ export interface Prospect {
   estado: ProspectEstado
   notas: string | null
   campaign_id: string | null
+  // Campos extendidos (ficha Google Maps) — opcionales, no todos los prospectos los tienen
+  horario?: string | null
+  categoria_google?: string | null
+  ficha_reclamada?: boolean | null
+  url_maps?: string | null
+  imagen_url?: string | null
+  resenas_texto?: string | null
   created_at: string
   updated_at: string
 }
@@ -113,6 +120,10 @@ export interface ImportRow {
   horario: string
   descripcion: string
   categoria_original: string
+  // Campos extendidos de Google Maps
+  ficha_reclamada: boolean
+  url_maps: string
+  imagen_url: string
 }
 
 export interface ScoredImportRow extends ImportRow {

@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
             nombre_empresa, nicho, direccion, email, telefono, web,
             valoracion_google, num_resenas,
             score_ia, score_etiqueta, score_justificacion,
-            estado
+            estado, horario, categoria_google, ficha_reclamada,
+            url_maps, imagen_url, resenas_texto
           ) VALUES (
             ${row.nombre_empresa},
             ${row.nicho},
@@ -47,7 +48,13 @@ export async function POST(request: NextRequest) {
             ${row.score_ia},
             ${row.score_etiqueta},
             ${row.score_justificacion},
-            'sin_contactar'
+            'sin_contactar',
+            ${row.horario || null},
+            ${row.categoria_original || null},
+            ${row.ficha_reclamada || false},
+            ${row.url_maps || null},
+            ${row.imagen_url || null},
+            ${row.reviews_text || null}
           )
           ON CONFLICT (email) DO NOTHING
         `

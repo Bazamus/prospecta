@@ -9,6 +9,7 @@ import {
   Mail,
   MessageCircle,
   FileText,
+  Settings,
   Zap,
   LogOut,
 } from "lucide-react"
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { href: "/messages", label: "Mensajes", icon: Mail },
   { href: "/messages?canal=whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/templates", label: "Plantillas", icon: FileText },
+  { href: "/settings", label: "Configuración", icon: Settings },
 ]
 
 export function Sidebar() {

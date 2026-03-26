@@ -1,6 +1,64 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db/neon"
 
+// POST /api/prospects — crear prospecto manual
+export async function POST(request: NextRequest) {
+  if (!sql) return NextResponse.json({ error: "DB no configurada" }, { status: 503 })
+
+  try {
+    const body = await request.json()
+    const {
+      nombre_empresa, nicho, email, telefono, direccion, contacto_nombre,
+      contacto_cargo, web, valoracion_google, num_resenas, notas,
+      score_ia, score_etiqueta, score_justificacion,
+      horario, categoria_google, url_maps, imagen_url, resenas_texto,
+    } = body
+
+    if (!nombre_empresa || !nicho) {
+      return NextResponse.json({ error: "Nombre y nicho son obligatorios" }, { status: 400 })
+    }
+
+    const result = await sql`
+      INSERT INTO prospects (
+        nombre_empresa, nicho, email, telefono, direccion,
+        contacto_nombre, contacto_cargo, web, valoracion_google, num_resenas,
+        notas, score_ia, score_etiqueta, score_justificacion,
+        horario, categoria_google, url_maps, imagen_url, resenas_texto, estado
+      ) VALUES (
+        ${nombre_empresa}, ${nicho}, ${email || null}, ${telefono || null}, ${direccion || null},
+        ${contacto_nombre || null}, ${contacto_cargo || null}, ${web || null},
+        ${valoracion_google || null}, ${num_resenas || null},
+        ${notas || null}, ${score_ia || null}, ${score_etiqueta || null}, ${score_justificacion || null},
+        ${horario || null}, ${categoria_google || null}, ${url_maps || null}, ${imagen_url || null}, ${resenas_texto || null},
+        'sin_contactar'
+      ) RETURNING *
+    `
+    return NextResponse.json({ prospect: result[0] }, { status: 201 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+// DELETE /api/prospects — borrado masivo por IDs
+export async function DELETE(request: NextRequest) {
+  if (!sql) return NextResponse.json({ error: "DB no configurada" }, { status: 503 })
+
+  try {
+    const body = await request.json()
+    const ids: string[] = body.ids
+    if (!ids || ids.length === 0) {
+      return NextResponse.json({ error: "Se requiere un array de IDs" }, { status: 400 })
+    }
+
+    // Borrar en cascada: messages y activity_log tienen ON DELETE CASCADE
+    const result = await sql(`DELETE FROM prospects WHERE id = ANY($1) RETURNING id`, [ids])
+    return NextResponse.json({ deleted: result.length })
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 })
+  }
+}
+
 // GET /api/prospects — lista paginada con filtros
 export async function GET(request: NextRequest) {
   if (!sql) {

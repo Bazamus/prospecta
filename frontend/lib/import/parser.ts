@@ -61,6 +61,8 @@ export function parseImportFile(buffer: ArrayBuffer): ImportRow[] {
       // Filtrar emails ocultos de herramientas de pago
       const emailClean = email.includes("Visible in Paid Version") ? "" : email
 
+      const reclamar = readField(row, "Reclamar", "reclamar")
+
       return {
         nombre_empresa: nombre,
         nicho: mapCategoriaNicho(categoriaOriginal),
@@ -74,6 +76,9 @@ export function parseImportFile(buffer: ArrayBuffer): ImportRow[] {
         horario: readField(row, "Horario", "horario", "Schedule", "Horarios"),
         descripcion: readField(row, "Descripción", "Descripcion", "descripcion", "Description"),
         categoria_original: categoriaOriginal,
+        ficha_reclamada: reclamar.toLowerCase() === "sí" || reclamar.toLowerCase() === "si" || reclamar.toLowerCase() === "yes",
+        url_maps: readField(row, "Url en Maps", "url_maps", "Google Maps URL"),
+        imagen_url: readField(row, "Imagen Url", "imagen_url", "Image Url"),
       }
     })
     .filter((row): row is ImportRow => row !== null)

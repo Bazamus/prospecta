@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { NichoSelect } from "@/components/ui/nicho-select"
+import { useNichos } from "@/lib/hooks/use-nichos"
 import {
   Dialog,
   DialogContent,
@@ -57,6 +59,7 @@ interface CampaignRow extends Campaign {
 }
 
 export default function CampaignsPage() {
+  const { nichoMap } = useNichos()
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -179,15 +182,7 @@ export default function CampaignsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Nicho</label>
-                  <Select value={form.nicho} onValueChange={(v) => setForm({ ...form, nicho: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="climatizacion">Climatización</SelectItem>
-                      <SelectItem value="instalaciones">Instalaciones</SelectItem>
-                      <SelectItem value="energia">Energía</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <NichoSelect value={form.nicho} onValueChange={(v) => setForm({ ...form, nicho: v })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Canal</label>
@@ -270,7 +265,7 @@ export default function CampaignsPage() {
                     <h3 className="font-semibold text-sm truncate">{campaign.nombre}</h3>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-[10px]">
-                        {NICHO_LABELS[campaign.nicho] || campaign.nicho}
+                        {nichoMap[campaign.nicho]?.nombre || campaign.nicho}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">
                         {CANAL_LABELS[campaign.canal] || campaign.canal}

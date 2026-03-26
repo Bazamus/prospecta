@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { anthropic, CLAUDE_MODEL, MAX_TOKENS_SCORING } from "@/lib/claude"
+import { callAI, MAX_TOKENS_SCORING } from "@/lib/ai-provider"
 import type { ScoreResponse } from "@/types"
 
 interface ScoreRequestBody {
@@ -17,15 +17,8 @@ interface ScoreRequestBody {
   telefono: string
 }
 
-// POST /api/prospects/score
-// Recibe datos de una empresa y devuelve score IA (0-10), etiqueta y justificación
 export async function POST(request: NextRequest) {
   const body: ScoreRequestBody = await request.json()
-
-  // Si no hay API key configurada, devolver score simulado para testing
-  if (!anthropic) {
-    return NextResponse.json<ScoreResponse>(generateMockScore(body))
-  }
 
   const systemPrompt = `Eres un analizador de prospectos comerciales especializado en ${body.nicho}.
 Tu tarea es evaluar si una empresa es un buen candidato para contactarle
@@ -60,38 +53,21 @@ No devuelvas nada más que el JSON. Sin explicaciones adicionales, sin markdown.
     horario: body.horario || null,
     descripcion: body.descripcion || null,
   }
-
-  // Añadir reseñas solo si hay
-  if (body.reviews_text) {
-    empresaData.resenas = body.reviews_text
-  }
+  if (body.reviews_text) empresaData.resenas = body.reviews_text
 
   try {
-    const response = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: MAX_TOKENS_SCORING,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify(empresaData),
-        },
-      ],
+    const text = await callAI({
       system: systemPrompt,
+      user: JSON.stringify(empresaData),
+      maxTokens: MAX_TOKENS_SCORING,
     })
 
-    const text =
-      response.content[0].type === "text" ? response.content[0].text : ""
-
-    // Extraer JSON de la respuesta (puede venir envuelto en backticks)
     const jsonMatch = text.match(/\{[\s\S]*?\}/)
     if (!jsonMatch) {
-      console.error("Claude no devolvió JSON válido:", text)
       return NextResponse.json<ScoreResponse>(generateMockScore(body))
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as ScoreResponse
-
-    // Validar rango
     const score = Math.max(0, Math.min(10, Math.round(parsed.score * 10) / 10))
     const validEtiquetas = ["Alta", "Media", "Baja", "Descartar"] as const
     const etiqueta = validEtiquetas.includes(parsed.etiqueta as typeof validEtiquetas[number])
@@ -104,38 +80,30 @@ No devuelvas nada más que el JSON. Sin explicaciones adicionales, sin markdown.
       justificacion: parsed.justificacion || "Sin justificación disponible",
     })
   } catch (error) {
-    console.error("Error llamando a Claude API:", error)
-    // Fallback a score simulado si Claude falla
+    const msg = error instanceof Error ? error.message : String(error)
+    // Si no hay config de IA, usar score simulado
+    if (msg === "NO_AI_CONFIG") {
+      return NextResponse.json<ScoreResponse>(generateMockScore(body))
+    }
+    console.error("Error scoring:", msg)
     return NextResponse.json<ScoreResponse>(generateMockScore(body))
   }
 }
 
-// Score simulado basado en heurísticas simples (para testing sin API key)
 function generateMockScore(body: ScoreRequestBody): ScoreResponse {
   let score = 5.0
-
-  // Tiene web → +1.5
   if (body.web) score += 1.5
-  // Tiene email → +0.5
   if (body.email) score += 0.5
-  // Valoración alta → +1
   if (body.valoracion_google && body.valoracion_google >= 4.0) score += 1.0
-  // Muchas reseñas → +1
   if (body.num_resenas && body.num_resenas >= 50) score += 1.0
-  // Tiene reseñas → +0.5
   if (body.reviews_text) score += 0.5
-  // Tiene horario → +0.5
   if (body.horario) score += 0.5
-  // Categoría es "otro" → -2
   if (body.nicho === "otro") score -= 2
-
   score = Math.max(0, Math.min(10, Math.round(score * 10) / 10))
-
   const etiqueta = score >= 8 ? "Alta" : score >= 5 ? "Media" : score >= 3 ? "Baja" : "Descartar"
-
   return {
     score,
     etiqueta: etiqueta as ScoreResponse["etiqueta"],
-    justificacion: `[Score simulado] Puntuación basada en heurísticas: ${body.web ? "tiene web" : "sin web"}, ${body.valoracion_google ?? "sin"} rating, ${body.num_resenas ?? 0} reseñas. Configura ANTHROPIC_API_KEY para scoring real con IA.`,
+    justificacion: `[Score simulado] ${body.web ? "tiene web" : "sin web"}, ${body.valoracion_google ?? "sin"} rating, ${body.num_resenas ?? 0} reseñas. Configura un proveedor IA en Configuración para scoring real.`,
   }
 }
