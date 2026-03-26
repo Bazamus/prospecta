@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(node -e \":*)",
+      "Bash(wc -l \"c:/Users/David_PC/Desktop/DAVID_CODE/prospecta/frontend/app/\\(dashboard\\)/prospects/[id]/page.tsx\")"
     ]
   }
 }
