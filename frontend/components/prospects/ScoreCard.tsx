@@ -35,13 +35,14 @@ function ScoreIcon({ etiqueta }: { etiqueta: ScoreEtiqueta }) {
 
 export function ScoreBadge({ score, etiqueta }: { score: number; etiqueta: ScoreEtiqueta }) {
   const config = ETIQUETA_CONFIG[etiqueta]
+  const numScore = typeof score === "string" ? parseFloat(score) : score
   return (
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-1">
         <div
           className={cn("h-2 w-2 rounded-full", config.bg)}
         />
-        <span className="text-sm font-semibold tabular-nums">{score.toFixed(1)}</span>
+        <span className="text-sm font-semibold tabular-nums">{numScore.toFixed(1)}</span>
       </div>
       <Badge variant={config.variant} className="text-[10px] px-1.5 py-0">
         {etiqueta}
@@ -52,9 +53,10 @@ export function ScoreBadge({ score, etiqueta }: { score: number; etiqueta: Score
 
 export function ScoreCard({ score, etiqueta, justificacion, compact = false }: Props) {
   const config = ETIQUETA_CONFIG[etiqueta]
+  const numScore = typeof score === "string" ? parseFloat(score) : score
 
   if (compact) {
-    return <ScoreBadge score={score} etiqueta={etiqueta} />
+    return <ScoreBadge score={numScore} etiqueta={etiqueta} />
   }
 
   return (
@@ -65,7 +67,7 @@ export function ScoreCard({ score, etiqueta, justificacion, compact = false }: P
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-3xl font-bold tabular-nums tracking-tight">
-                {score.toFixed(1)}
+                {numScore.toFixed(1)}
               </span>
               <span className="text-lg text-muted-foreground">/10</span>
               <Badge variant={config.variant} className="ml-1">
@@ -86,7 +88,7 @@ export function ScoreCard({ score, etiqueta, justificacion, compact = false }: P
           <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className={cn("h-full rounded-full transition-all", config.bg)}
-              style={{ width: `${(score / 10) * 100}%` }}
+              style={{ width: `${(numScore / 10) * 100}%` }}
             />
           </div>
         </div>

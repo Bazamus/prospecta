@@ -13,27 +13,27 @@ import { cn } from "@/lib/utils"
 const TIPO_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
   scoring: {
     icon: <Zap className="h-3.5 w-3.5" />,
-    color: "bg-violet-500/15 text-violet-500",
+    color: "bg-violet-500/15 text-violet-700 dark:text-violet-500",
   },
   email: {
     icon: <Mail className="h-3.5 w-3.5" />,
-    color: "bg-blue-500/15 text-blue-500",
+    color: "bg-blue-500/15 text-blue-700 dark:text-blue-500",
   },
   whatsapp: {
     icon: <MessageCircle className="h-3.5 w-3.5" />,
-    color: "bg-emerald-500/15 text-emerald-500",
+    color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-500",
   },
   respuesta: {
     icon: <Reply className="h-3.5 w-3.5" />,
-    color: "bg-amber-500/15 text-amber-500",
+    color: "bg-amber-500/15 text-amber-700 dark:text-amber-500",
   },
   nota: {
     icon: <StickyNote className="h-3.5 w-3.5" />,
-    color: "bg-slate-500/15 text-slate-400",
+    color: "bg-slate-500/15 text-slate-600 dark:text-slate-400",
   },
   estado: {
     icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
-    color: "bg-indigo-500/15 text-indigo-500",
+    color: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-500",
   },
 }
 

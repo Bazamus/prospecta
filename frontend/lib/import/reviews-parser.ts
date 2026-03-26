@@ -1,24 +1,49 @@
-// Parsea el campo ReviewsText (XML) y devuelve texto plano concatenado
-// para enviarlo como contexto adicional a Claude API durante el scoring
+// Parsea el campo ReviewsText (XML de Google Maps) y devuelve texto plano
+// para enviarlo como contexto adicional a Claude API durante el scoring.
+//
+// Formato esperado:
+// <reviews>
+//   <review>
+//     <user>Nombre usuario</user>
+//     <stars>5</stars>
+//     <userComment>Texto de la reseña...</userComment>
+//   </review>
+// </reviews>
+
+interface ParsedReview {
+  stars: number
+  comment: string
+}
 
 export function parseReviewsXml(xml: string): string {
-  if (!xml || xml.trim() === "") return ""
+  if (!xml || xml.trim() === "" || xml === "undefined") return ""
 
-  // TODO: implementar en Fase 1 con un parser XML real (DOMParser en cliente o fast-xml-parser en servidor)
-  // Formato esperado:
-  // <reviews>
-  //   <review>
-  //     <user>Nombre</user>
-  //     <stars>5</stars>
-  //     <userComment>Texto de la reseña</userComment>
-  //   </review>
-  // </reviews>
+  const reviews: ParsedReview[] = []
 
-  // Extracción básica con regex como fallback
-  const comments = [...xml.matchAll(/<userComment>([\s\S]*?)<\/userComment>/g)]
-    .map((m) => m[1].trim())
-    .filter(Boolean)
-    .slice(0, 10) // máximo 10 reseñas para no exceder el contexto de Claude
+  // Extraer cada bloque <review>
+  const reviewBlocks = [...xml.matchAll(/<review>([\s\S]*?)<\/review>/g)]
 
-  return comments.join(" | ")
+  for (const block of reviewBlocks) {
+    const content = block[1]
+
+    const starsMatch = content.match(/<stars>([\s\S]*?)<\/stars>/)
+    const commentMatch = content.match(/<userComment>([\s\S]*?)<\/userComment>/)
+
+    const stars = starsMatch ? parseInt(starsMatch[1].trim(), 10) : 0
+    const comment = commentMatch ? commentMatch[1].trim() : ""
+
+    if (comment) {
+      reviews.push({ stars, comment })
+    }
+  }
+
+  if (reviews.length === 0) return ""
+
+  // Limitar a 10 reseñas para no exceder el contexto de Claude
+  const limited = reviews.slice(0, 10)
+
+  // Formato: "★5: Texto de la reseña | ★4: Otra reseña..."
+  return limited
+    .map((r) => `★${r.stars}: ${r.comment}`)
+    .join(" | ")
 }
