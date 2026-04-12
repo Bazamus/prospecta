@@ -10,16 +10,19 @@ import { Loader2 } from "lucide-react"
 import type { ActivityLog, Campaign } from "@/types"
 
 const NICHO_LABELS: Record<string, string> = {
-  climatizacion: "Climatización",
-  instalaciones: "Instalaciones",
-  energia: "Energía",
-  otro: "Otro",
+  climatizacion: "Climatización", instalaciones: "Instalaciones", energia: "Energía",
+  aislamiento: "Aislamiento", electricidad: "Electricidad", pci: "PCI",
+  general: "General", otro: "Otro",
 }
 
 interface DashboardData {
-  stats: { total: number; respondieron: number; interesados: number; demos: number }
+  stats: {
+    total: number; respondieron: number; interesados: number; demos: number
+    conAds: number; recomendados: number; conEmail: number; conLinkedin: number
+  }
   funnel: { label: string; value: number; color: string }[]
   scoreDistribution: { alta: number; media: number; baja: number; descartar: number }
+  categoryDistribution: { category: string; count: number }[]
   activity: ActivityLog[]
   activeCampaigns: (Campaign & { prospects_count?: number })[]
 }
@@ -31,11 +34,9 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Fetch all data in parallel
-        const [prospectsRes, campaignsRes, activityRes] = await Promise.all([
+        const [prospectsRes, campaignsRes] = await Promise.all([
           fetch("/api/prospects?limit=1000"),
           fetch("/api/campaigns"),
-          fetch("/api/prospects?limit=1"), // just for total count
         ])
 
         let prospects: any[] = []
@@ -50,7 +51,7 @@ export default function DashboardPage() {
           campaigns = json.data || []
         }
 
-        // Calculate stats
+        // Pipeline stats
         const total = prospects.length
         const respondieron = prospects.filter((p: any) =>
           ["respondio", "interesado", "demo_enviada", "cerrado"].includes(p.estado)
@@ -62,12 +63,17 @@ export default function DashboardPage() {
           ["demo_enviada", "cerrado"].includes(p.estado)
         ).length
 
+        // V2 stats
+        const conAds = prospects.filter((p: any) => p.is_spending_on_ads).length
+        const recomendados = prospects.filter((p: any) => p.is_worth_pursuing).length
+        const conEmail = prospects.filter((p: any) => p.email).length
+        const conLinkedin = prospects.filter((p: any) => p.linkedin).length
+
         // Funnel
         const counts: Record<string, number> = {}
         for (const p of prospects) {
           counts[p.estado] = (counts[p.estado] || 0) + 1
         }
-
         const funnel = [
           { label: "Sin contactar", value: counts["sin_contactar"] || 0, color: "bg-slate-500" },
           { label: "Contactados", value: counts["contactado"] || 0, color: "bg-blue-500" },
@@ -85,8 +91,19 @@ export default function DashboardPage() {
           descartar: prospects.filter((p: any) => p.score_etiqueta === "Descartar").length,
         }
 
-        // Activity: use the most recent 10 activity_log entries
-        // We'll fetch from a few prospects
+        // Category distribution (top 10 main_category)
+        const catCounts: Record<string, number> = {}
+        for (const p of prospects) {
+          if (p.main_category) {
+            catCounts[p.main_category] = (catCounts[p.main_category] || 0) + 1
+          }
+        }
+        const categoryDistribution = Object.entries(catCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([category, count]) => ({ category, count }))
+
+        // Activity
         let activity: ActivityLog[] = []
         if (prospects.length > 0) {
           try {
@@ -107,9 +124,10 @@ export default function DashboardPage() {
         const activeCampaigns = campaigns.filter((c: any) => c.estado === "activa")
 
         setData({
-          stats: { total, respondieron, interesados, demos },
+          stats: { total, respondieron, interesados, demos, conAds, recomendados, conEmail, conLinkedin },
           funnel,
           scoreDistribution,
+          categoryDistribution,
           activity,
           activeCampaigns,
         })
@@ -148,6 +166,10 @@ export default function DashboardPage() {
         respondieron={data.stats.respondieron}
         interesados={data.stats.interesados}
         demos={data.stats.demos}
+        conAds={data.stats.conAds}
+        recomendados={data.stats.recomendados}
+        conEmail={data.stats.conEmail}
+        conLinkedin={data.stats.conLinkedin}
       />
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -180,6 +202,34 @@ export default function DashboardPage() {
 
         <div className="lg:col-span-3 space-y-6">
           <ActivityFeed activity={data.activity} />
+
+          {/* Categorías Google Maps */}
+          {data.categoryDistribution.length > 0 && (
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">Top categorías Google Maps</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                {data.categoryDistribution.map((item) => {
+                  const pct = Math.round((item.count / totalProspects) * 100)
+                  return (
+                    <div key={item.category} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground truncate flex-1 pr-2">{item.category}</span>
+                        <span className="font-semibold tabular-nums flex-shrink-0">{item.count}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-violet-500"
+                          style={{ width: `${Math.min(100, (item.count / (data.categoryDistribution[0]?.count || 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-4">

@@ -74,6 +74,14 @@ export async function GET(request: NextRequest) {
   const estado = searchParams.get("estado")
   const scoreMin = searchParams.get("score_min")
   const search = searchParams.get("search")
+  const productoObjetivo = searchParams.get("producto_objetivo")
+  const spendingOnAds = searchParams.get("spending_on_ads")
+  const worthPursuing = searchParams.get("worth_pursuing")
+  const hasEmail = searchParams.get("has_email")
+  const hasPhone = searchParams.get("has_phone")
+  const hasLinkedin = searchParams.get("has_linkedin")
+  const location = searchParams.get("location")
+  const mainCategory = searchParams.get("main_category")
   const sortBy = searchParams.get("sort") || "score_ia"
   const sortDir = searchParams.get("dir") === "asc" ? "ASC" : "DESC"
 
@@ -94,6 +102,33 @@ export async function GET(request: NextRequest) {
     if (scoreMin) {
       conditions.push(`score_ia >= $${paramIdx++}`)
       params.push(parseFloat(scoreMin))
+    }
+    if (productoObjetivo) {
+      conditions.push(`producto_objetivo = $${paramIdx++}`)
+      params.push(productoObjetivo)
+    }
+    if (spendingOnAds === "true") {
+      conditions.push(`is_spending_on_ads = true`)
+    }
+    if (worthPursuing === "true") {
+      conditions.push(`is_worth_pursuing = true`)
+    }
+    if (hasEmail === "true") {
+      conditions.push(`email IS NOT NULL AND TRIM(email) != ''`)
+    }
+    if (hasPhone === "true") {
+      conditions.push(`telefono IS NOT NULL AND TRIM(telefono) != ''`)
+    }
+    if (hasLinkedin === "true") {
+      conditions.push(`linkedin IS NOT NULL AND TRIM(linkedin) != ''`)
+    }
+    if (location) {
+      conditions.push(`TRIM(REGEXP_REPLACE(direccion, '^.*,\\s*', '')) = $${paramIdx++}`)
+      params.push(location)
+    }
+    if (mainCategory) {
+      conditions.push(`main_category = $${paramIdx++}`)
+      params.push(mainCategory)
     }
     if (search) {
       conditions.push(`(nombre_empresa ILIKE $${paramIdx} OR email ILIKE $${paramIdx} OR contacto_nombre ILIKE $${paramIdx})`)

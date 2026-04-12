@@ -35,6 +35,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       "score_ia", "score_etiqueta", "score_justificacion",
       "estado", "notas", "campaign_id",
       "horario", "categoria_google", "ficha_reclamada", "url_maps", "imagen_url", "resenas_texto",
+      "sales_summary", "sales_relevance", "size_indicators",
     ]
 
     const validEstados = [
