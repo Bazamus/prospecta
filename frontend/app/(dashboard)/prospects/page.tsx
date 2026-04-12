@@ -460,8 +460,8 @@ export default function ProspectsPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {p.score_ia !== null && p.score_etiqueta
-                    ? <ScoreBadge score={p.score_ia} etiqueta={p.score_etiqueta} />
+                  {p.score_ia != null
+                    ? <ScoreBadge score={p.score_ia} etiqueta={(p.score_etiqueta || (Number(p.score_ia) >= 8 ? "Alta" : Number(p.score_ia) >= 5 ? "Media" : Number(p.score_ia) >= 3 ? "Baja" : "Descartar")) as any} />
                     : <span className="text-xs text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell>

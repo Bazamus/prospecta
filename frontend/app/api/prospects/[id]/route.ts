@@ -53,8 +53,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
+        let val = body[field] === "" ? null : body[field]
+        // Auto-derive score_etiqueta if being cleared while score_ia is being set to a number
+        if (field === "score_etiqueta" && val === null && body.score_ia != null && body.score_ia !== "") {
+          const s = Number(body.score_ia)
+          if (!isNaN(s)) val = s >= 8 ? "Alta" : s >= 5 ? "Media" : s >= 3 ? "Baja" : "Descartar"
+        }
         sets.push(`${field} = $${idx++}`)
-        values.push(body[field] === "" ? null : body[field])
+        values.push(val)
       }
     }
 

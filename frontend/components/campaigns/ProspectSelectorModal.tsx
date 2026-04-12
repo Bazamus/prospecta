@@ -33,7 +33,7 @@ export function ProspectSelectorModal({ campaignId, scoreMinimo, excludeIds, ope
   useEffect(() => {
     if (!open) return
     setLoading(true); setSelected(new Set())
-    fetch(`/api/prospects?limit=500&score_min=${scoreMinimo}&sort=score_ia&dir=desc`)
+    fetch(`/api/prospects?limit=500&sort=score_ia&dir=desc`)
       .then((r) => r.json())
       .then((json) => {
         const available = (json.data || []).filter((p: Prospect) => !excludeIds.includes(p.id))
@@ -68,7 +68,7 @@ export function ProspectSelectorModal({ campaignId, scoreMinimo, excludeIds, ope
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Añadir prospectos a la campaña</DialogTitle>
-          <DialogDescription>Score mínimo: {scoreMinimo} · {prospects.length} disponibles</DialogDescription>
+          <DialogDescription>{prospects.length} disponibles · Score mínimo campaña: {scoreMinimo}</DialogDescription>
         </DialogHeader>
 
         <div className="relative">
@@ -100,7 +100,9 @@ export function ProspectSelectorModal({ campaignId, scoreMinimo, excludeIds, ope
                   <Badge variant="outline" className="text-[10px] flex-shrink-0" style={nichoMap[p.nicho] ? { borderColor: nichoMap[p.nicho].color, color: nichoMap[p.nicho].color } : undefined}>
                     {nichoMap[p.nicho]?.nombre || p.nicho}
                   </Badge>
-                  {p.score_ia !== null && p.score_etiqueta && <ScoreBadge score={p.score_ia} etiqueta={p.score_etiqueta} />}
+                  {p.score_ia != null
+                    ? <ScoreBadge score={p.score_ia} etiqueta={(p.score_etiqueta || (Number(p.score_ia) >= 8 ? "Alta" : Number(p.score_ia) >= 5 ? "Media" : Number(p.score_ia) >= 3 ? "Baja" : "Descartar")) as any} />
+                    : <Badge variant="secondary" className="text-[10px] text-muted-foreground">Sin score</Badge>}
                 </div>
               ))}
             </div>

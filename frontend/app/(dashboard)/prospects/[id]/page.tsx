@@ -22,6 +22,7 @@ import {
   MapPin, Star, Zap, Reply, StickyNote, ArrowRightLeft, ExternalLink,
   Pencil, Trash2, Clock, Tag, ImageIcon, Linkedin, Facebook, Instagram,
   Twitter, Youtube, TrendingUp, BarChart2, Users, ChevronDown, ChevronUp,
+  Sparkles, RefreshCw,
 } from "lucide-react"
 import type { Prospect, Message, ActivityLog } from "@/types"
 
@@ -133,6 +134,7 @@ export default function ProspectDetailPage({ params }: { params: { id: string } 
   const [summaryExpanded, setSummaryExpanded] = useState(false)
   const [translating, setTranslating] = useState(false)
   const [intelEditOpen, setIntelEditOpen] = useState(false)
+  const [scoring, setScoring] = useState(false)
 
   async function load() {
     try {
@@ -189,6 +191,29 @@ export default function ProspectDetailPage({ params }: { params: { id: string } 
     setDeleteLoading(true)
     await fetch(`/api/prospects/${params.id}`, { method: "DELETE" })
     router.push("/prospects")
+  }
+
+  async function handleScore() {
+    setScoring(true)
+    try {
+      const res = await fetch(`/api/prospects/${params.id}/score`, { method: "POST" })
+      if (res.ok) {
+        const data = await res.json()
+        setProspect((prev) => prev ? {
+          ...prev,
+          score_ia: data.score_ia,
+          score_etiqueta: data.score_etiqueta,
+          score_justificacion: data.score_justificacion,
+        } : prev)
+        // Refrescar actividad
+        const actRes = await fetch(`/api/prospects/${params.id}`)
+        if (actRes.ok) {
+          const json = await actRes.json()
+          setActivity(json.activity || [])
+        }
+      }
+    } catch (e) { console.error(e) }
+    finally { setScoring(false) }
   }
 
   async function handleTranslate() {
@@ -264,9 +289,46 @@ export default function ProspectDetailPage({ params }: { params: { id: string } 
         {/* ── Left column (40%) ── */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* Score Card */}
-          {prospect.score_ia !== null && prospect.score_etiqueta && (
-            <ScoreCard score={prospect.score_ia} etiqueta={prospect.score_etiqueta} justificacion={prospect.score_justificacion || ""} />
+          {/* Score Card / Scoring bajo demanda */}
+          {prospect.score_ia != null ? (
+            <div className="space-y-2">
+              <ScoreCard
+                score={prospect.score_ia}
+                etiqueta={(prospect.score_etiqueta || (Number(prospect.score_ia) >= 8 ? "Alta" : Number(prospect.score_ia) >= 5 ? "Media" : Number(prospect.score_ia) >= 3 ? "Baja" : "Descartar")) as any}
+                justificacion={prospect.score_justificacion || ""}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleScore}
+                disabled={scoring}
+                className="w-full gap-1.5 text-muted-foreground text-xs"
+              >
+                {scoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Re-evaluar
+              </Button>
+            </div>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="p-5 flex flex-col items-center gap-3 text-center">
+                <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Sin score IA</p>
+                  <p className="text-xs text-muted-foreground">Analiza este prospecto para obtener una valoración automática</p>
+                </div>
+                <Button
+                  onClick={handleScore}
+                  disabled={scoring}
+                  size="sm"
+                  className="gap-2 bg-violet-600 hover:bg-violet-700"
+                >
+                  {scoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                  {scoring ? "Analizando..." : "Ejecutar Scoring IA"}
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* ── NUEVA: Inteligencia Comercial ── */}
